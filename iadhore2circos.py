@@ -17,6 +17,84 @@ BREWER_COL = ['blues-%s-seq-3', 'bugn-%s-seq-3', 'bupu-%s-seq-3', 'gnbu-%s-seq-3
         'ylorbr-%s-seq-3', 'ylorrd-%s-seq-3']
 BREWER_COL_RANGE = range(3,10)
 
+TICKS_CONF = ''' 
+show_ticks          = yes
+show_tick_labels    = yes
+
+<ticks>
+radius           = 1r
+color            = black
+thickness        = 2p
+
+# the tick label is derived by multiplying the tick position
+# by 'multiplier' and casting it in 'format':
+#
+# sprintf(format,position*multiplier)
+#
+
+multiplier       = 1e-6
+
+# %d   - integer
+# %f   - float
+# %.1f - float with one decimal
+# %.2f - float with two decimals
+#
+# for other formats, see http://perldoc.perl.org/functions/sprintf.html
+
+format           = %d
+
+<tick>
+spacing        = 5u
+size           = 10p
+</tick>
+
+<tick>
+spacing        = 25u
+size           = 15p
+show_label     = yes
+label_size     = 20p
+label_offset   = 10p
+format         = %d
+</tick>
+
+</ticks>
+'''
+
+IDEOGRAM_CONF = '''
+<ideogram>
+
+<spacing>
+default = 0.005r
+</spacing>
+
+# Ideogram position, fill and outline
+radius           = 0.92r
+thickness        = 100p
+# fill             = yes
+# fill_color       = black
+# stroke_color     = black
+stroke_thickness = 0
+
+show_bands            = yes
+fill_bands            = yes
+band_stroke_thickness = 0
+# band_stroke_color     = white
+band_transparency     = 1
+
+# Minimum definition for ideogram labels.
+
+show_label       = yes
+# see etc/fonts.conf for list of font names
+label_font       = default 
+label_radius     = 1.045r  # if ideogram radius is constant, and you'd like labels close to image edge, 
+                           # use the dims() function to access the size of the image
+                           # label_radius  = dims(image,radius) - 60p
+label_size       = 60
+label_parallel   = yes
+
+</ideogram>
+'''
+
 def readIadhoreConfig(data):
 
     res = list()
@@ -262,11 +340,22 @@ if __name__ == '__main__':
     gNames, genomes = readGenomes(iadhoreConfig, dirname(args[0]))
 
     #
+    # write ticks & ideogram conf 
+    #
+
+    ticks_out = open(join(options.outDir, 'ticks.conf'), 'w')
+    ticks_out.write(TICKS_CONF)
+    ticks_out.close()
+
+    ideo_out = open(join(options.outDir, 'ideogram.conf'), 'w')
+    ideo_out.write(IDEOGRAM_CONF)
+    ideo_out.close()
+    #
     # write karyotypes
     #
 
     for i in xrange(len(genomes)):
-        out = open('%s/karyotype.%s.txt' %(options.outDir, gNames[i]), 'w')
+        out = open(join(options.outDir, 'karyotype.%s.txt' %gNames[i]), 'w')
         writeKaryotype(genomes[i], gNames[i], out)
         out.close() 
 
@@ -280,7 +369,7 @@ if __name__ == '__main__':
 
     gname2id = dict(zip(gNames, range(len(gNames))))
     for (G1, G2), sbs in syn_blocks.items():
-        out = open('%s/%s_%s.links' %(options.outDir, G1, G2), 'w')
+        out = open(join(options.outDir, '%s_%s.links' %(G1, G2)), 'w')
         sbs.sort()
         for x in sbs:
             print >> out, ' '.join(map(str, x[:-2])), ('mid=%s,' + \
@@ -288,6 +377,6 @@ if __name__ == '__main__':
         out.flush()
         out.close()
    
-        out = open('%s/%s_%s.circos.conf' %(options.outDir, G1, G2), 'w')
+        out = open(join(options.outDir, '%s_%s.circos.conf' %(G1, G2)), 'w')
         writeCircosConf(G1, genomes[gname2id[G1]], G2, genomes[gname2id[G2]],
                 segments.keys(), sbs, out)
