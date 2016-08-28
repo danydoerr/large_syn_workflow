@@ -10,5 +10,5 @@ Software:
 
 Python libraries:
  - [BioPython] (http://biopython.org/)
- - [matplotlib] (http://matplotlib.org/)
+ - [matplotlib] (http://matplotlib.org/) (optional)
 
