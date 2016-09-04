@@ -5,13 +5,16 @@ from optparse import OptionParser
 from Bio import SeqIO, Seq, Alphabet
 from cStringIO import StringIO
 
+MINLEN_DEFAULT=10
+
 if __name__ == '__main__':
 
     usage = 'usage: %prog [options] <FASTA FILE>'
     parser = OptionParser(usage=usage)
-    parser.add_option('-l', '--min_len', dest='minLength', type=int, default=10, 
+    parser.add_option('-l', '--min_len', dest='minLength', type=int,
+            default=MINLEN_DEFAULT, 
             help='Minimum number of consecutive X/N characters that are ' + \
-                    'considered for removal')
+                    'considered for removal. [default=%default]')
 
     (options, args) = parser.parse_args()
 
