@@ -14,6 +14,7 @@ import os
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
 
+CLUSTER_TYPE_DEFAULT = 'colinear'
 MIN_LENGTH_DEFAULT = 100
 MAX_GAPSIZE_DEFAULT = 30
 QVALUE_DEFAULT = 0.5
@@ -83,7 +84,7 @@ def writeIadhoreFiles(genomes, gNames, orthologies, clusterType, gapSize, q,
 
     print >> configOut, 'blast_table= blast_table.txt'
     print >> configOut, 'output_path= output'
-    print >> configOut, 'q_value= ' %q
+    print >> configOut, 'q_value= %s' %q
     print >> configOut, 'tandem_gap=%s' %min(gapSize/2, 5)
     print >> configOut, 'gap_size= %s' %gapSize
     print >> configOut, 'cloud_gap_size= %s' %gapSize
@@ -163,8 +164,8 @@ if __name__ == '__main__':
             metavar='INT')
 
     parser.add_option('-c', '--cluster_type', dest='clusterType',
-            default='hybrid', type='str', help='i-AdHoRe cluster type, ' + \
-                    'must be any of (colinear|hybrid|cloud) [default: ' + \
+            default=CLUSTER_TYPE_DEFAULT, type='str', help='i-AdHoRe cluster' + \
+            ' type, must be any of (colinear|hybrid|cloud) [default: ' + \
                     '%default]')
 
     parser.add_option('-q', '--q_value', dest='q', help='Minimum r^2 ' + \
@@ -217,6 +218,5 @@ if __name__ == '__main__':
 
     LOG.info('constructing backbone file')
     writeIadhoreFiles(genomes, genomeNames, orthologies, options.clusterType,
-            options.q, options.outDir)
+            options.gapSize, options.q, options.outDir)
     LOG.info('finished')
-
