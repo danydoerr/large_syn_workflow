@@ -69,7 +69,7 @@ def writeIadhoreFiles(genomes, gNames, orthologies, clusterType, gapSize, q,
         cur_out = prev_chr = None
         for gid, chr_name, start, end, strand in genomes[i]:
             if prev_chr != chr_name:
-                print >> configOut, '%s %s/%s.lst' %(chr_name, gDir, chr_name)
+                print >> configOut, '%s %s/%s.lst' %(chr_name, gNames[i], chr_name)
                 if cur_out != None:
                     cur_out.flush()
                     cur_out.close()
