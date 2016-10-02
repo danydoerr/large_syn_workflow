@@ -2,7 +2,7 @@
 
 from sys import stdout,stderr,exit
 from optparse import OptionParser
-from os.path import basename, exists, isdir
+from os.path import basename, exists, isdir, join
 from itertools import combinations
 from multiprocessing import cpu_count
 from Bio import SeqIO
@@ -185,12 +185,16 @@ if __name__ == '__main__':
     mauveFile = args[0]
     seqFiles = args[1:]
 
+    if not isdir(options.outDir):
+        os.makedirs(options.outDir)
+
+
     # setup logging
     ch = logging.StreamHandler(stderr)
     ch.setLevel(logging.ERROR)
     ch.setFormatter(logging.Formatter('!! %(message)s'))
     
-    cf = logging.FileHandler('%s.log' %(basename(args[0]).rsplit('.', 1)[0]), mode='w')
+    cf = logging.FileHandler('%s.log' %(join(options.outDir, basename(args[0]).rsplit('.', 1)[0])), mode='w')
     cf.setLevel(logging.INFO)
     cf.setFormatter(logging.Formatter('%(levelname)s\t%(asctime)s\t++ %(message)s'))
 
