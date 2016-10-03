@@ -113,7 +113,8 @@ def weightedScore(segments, genomes, gpos, blastMap):
                     if i == j-1:
                         continue
                     G2, g2k, g2l = segments[mid][j-1]
-                    hasHit = blastMap[(G1, G2)].has_key(g1x)
+                    hasHit = blastMap.has_key((G1, G2)) and \
+                            blastMap[(G1, G2)].has_key(g1x)
                     if not hasHit:
                         break
                     start2, end2 = sorted((gpos[G2][g2k], gpos[G2][g2l]))
@@ -148,8 +149,9 @@ def relaxedScore(segments, genomes, gpos, blastMap):
                     if i == j-1:
                         continue
                     G2, g2k, g2l = segments[mid][j-1]
-                    if not blastMap[(G1, G2)].has_key(g1x):
-                        break
+                    if not blastMap.has_key((G1, G2)) or \
+                            not blastMap[(G1, G2)].has_key(g1x):
+                            break
                     start2, end2 = sorted((gpos[G2][g2k], gpos[G2][g2l]))
                     for g2y in blastMap[(G1, G2)][g1x]:
                         y = gpos[G2][g2y]
