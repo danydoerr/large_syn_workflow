@@ -17,6 +17,7 @@ LOG.setLevel(logging.DEBUG)
 CLUSTER_TYPE_DEFAULT = 'colinear'
 MIN_LENGTH_DEFAULT = 100
 MAX_GAPSIZE_DEFAULT = 30
+QUORUM_DEFAULT = 2
 QVALUE_DEFAULT = 0.5
 
 def readChrLengths(seqFiles, genomeNames):
@@ -102,7 +103,7 @@ def writeIadhoreFiles(genomes, gNames, orthologies, clusterType, gapSize, q,
     configOut.close()
 
 
-def parseMauveBackbone(chr_locations, mauveFile, minLength):
+def parseMauveBackbone(chr_locations, mauveFile, minLength, quorum):
 
     genomes = [list() for _ in chr_locations]
     orthologies = list()
@@ -137,11 +138,12 @@ def parseMauveBackbone(chr_locations, mauveFile, minLength):
             chr_start, chr_name = chr_locations[i][x-1]
             gid = '%s_%s' %(genomeNames[i], outCount)
             g1i = (gid, chr_name, start+1-chr_start, end-chr_start, orient)
-            genomes[i].append(g1i)
-            cur_orth.append(g1i)
+            cur_orth.append((i, g1i))
         
-        if len(cur_orth) > 1:
-            orthologies.extend(combinations(cur_orth, 2))
+        if len(cur_orth) >= quorum:
+            for i, g1i in cur_orth:
+                genomes[i].append(g1i)
+            orthologies.extend(combinations(map(lambda x: x[1], cur_orth), 2))
 
     for i in xrange(len(genomes)):
         genomes[i].sort(key=lambda x: x[1:3])
@@ -161,6 +163,11 @@ if __name__ == '__main__':
     parser.add_option('-g', '--max_gap_size', dest='gapSize', help='Maximum' + \
             ' distance between markers in a cloud or collinear cluster. ' + \
             '[default=%default]', type=int, default=MAX_GAPSIZE_DEFAULT,
+            metavar='INT')
+
+    parser.add_option('-n', '--quorum', dest='genomeQuorum', help='Minimum' + \
+            ' number of genomes that must be covered by each marker ' + \
+            '[default=%default]', type=int, default=QUORUM_DEFAULT,
             metavar='INT')
 
     parser.add_option('-c', '--cluster_type', dest='clusterType',
@@ -213,12 +220,13 @@ if __name__ == '__main__':
 
 
     genomes, orthologies = parseMauveBackbone(chr_locations, mauveFile,
-            options.minLength)
+            options.minLength, options.genomeQuorum)
 
-    LOG.info('#bp covered by mauve markers of min length %s:' %(options.minLength))
+    LOG.info(('#bp covered by mauve markers of min length %s with quorum ' + \
+            '%s:') %(options.minLength, options.genomeQuorum))
     for i in xrange(len(genomes)):
-        LOG.info('\t%s\t%s' %(genomeNames[i], sum(map(lambda x: x[3]-x[2]+1,
-            genomes[i]))))
+        LOG.info('\t%s\t#markers: %s\t#bp: %s' %(genomeNames[i],
+            len(genomes[i]), sum(map(lambda x: x[3]-x[2]+1, genomes[i]))))
 
     LOG.info('constructing backbone file')
     writeIadhoreFiles(genomes, genomeNames, orthologies, options.clusterType,
