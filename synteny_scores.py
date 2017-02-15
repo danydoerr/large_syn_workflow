@@ -109,9 +109,15 @@ def readSegments(data):
     return res
 
 
-def weightedScore(segments, marker_seqs, blastMap):
+def weightedScore(segments, marker_seqs, blastMap, onlyAll=False):
     res = list()
+
+    if onlyAll:
+        n = len(set(reduce(lambda x,y: x+y, blastMap.keys())))
+
     for mid in sorted(segments.keys()):
+        if onlyAll and len(set(x for _, x, _, _ in segments[mid])) < n:
+            continue
         c = 0.0
         s = 0
         for i in xrange(len(segments[mid])):
@@ -141,9 +147,11 @@ def weightedScore(segments, marker_seqs, blastMap):
     return res
 
 
-def relaxedScore(segments, marker_seqs, blastMap):
+def relaxedScore(segments, marker_seqs, blastMap, onlyAll=False):
     res = list()
     for mid in sorted(segments.keys()):
+        if onlyAll and len(set(x for _, x, _, _ in segments[mid])) < n:
+            continue
         c = 0.0
         s = 0
         for i in xrange(len(segments[mid])):
@@ -198,6 +206,10 @@ if __name__ == '__main__':
     parser.add_option('-t', '--type', dest='type', default='relaxed', type=str,
             help='Scoring type. [default: %default]', metavar=
             '(relaxed|weighted)')
+    parser.add_option('-o', '--only_all', dest='onlyAll', default=False,
+            action='store_true', help='Consider only those multiplicons ' + \
+                    'that span all genomes, not just a subset [default: ' + \
+                    '%default]')
     parser.add_option('-f', '--figure_name', dest='figName', default='(relaxed' + \
             '|weighted)_scores.eps', type=str, help='Name of output file of ' + \
             'histogram. Only applicable in combination with -v. [default:' + \
@@ -216,7 +228,7 @@ if __name__ == '__main__':
     ch.setLevel(logging.ERROR)
     ch.setFormatter(logging.Formatter('!! %(message)s'))
     
-    cf = logging.FileHandler('%s.log' %(basename(args[0]).rsplit('.', 1)[0]), mode='w')
+    cf = logging.FileHandler('%s.synteny_scores.log' %(basename(args[0]).rsplit('.', 1)[0]), mode='w')
     cf.setLevel(logging.INFO)
     cf.setFormatter(logging.Formatter('%(levelname)s\t%(asctime)s\t++ %(message)s'))
 
@@ -253,12 +265,11 @@ if __name__ == '__main__':
     blastMap = readBlastTable(open(join(dirname(args[0]),
         iadhoreCMap['blast_table'])), gene2genome)
 
-
     scores = None
     if options.type == 'relaxed':
-        scores = relaxedScore(segments, marker_seqs, blastMap)
+        scores = relaxedScore(segments, marker_seqs, blastMap, options.onlyAll)
     elif options.type == 'weighted':
-        scores = weightedScore(segments, marker_seqs, blastMap)
+        scores = weightedScore(segments, marker_seqs, blastMap, options.onlyAll)
     else:
         LOG.fatal('Scoring type must be either relaxed or weighted. Exiting')
         exit(1)
@@ -268,5 +279,25 @@ if __name__ == '__main__':
     else:
         for s in scores:
             print >> stdout, '%s\t%s' %s
+
+    # compute coverage
+    gNames = sorted(set(reduce(lambda x,y: x+y, blastMap.keys())))
+    covered_markers = dict((G1, set()) for G1 in gNames)
+    for seg in segments.values():
+        if options.onlyAll and len(set(x for _, x, _, _ in seg)) < len(gNames):
+            continue
+        for sid, G1, _, _ in seg:
+            covered_markers[G1].update(marker_seqs[sid])
+
+    res = dict()
+    for G1, markers in covered_markers.items(): 
+        res[G1] = 0
+        for g1i in markers:
+            m = MARKER_PAT.match(g1i)
+            _, start, end, _ = m.groups()
+            res[G1] += int(end)-int(start)+1
+
+    LOG.info('Coverage: \n%s' %('\n'.join(map(lambda x: '\t'.join(map(str, x)),
+        sorted(res.items())))))
 
     LOG.info('finished')
