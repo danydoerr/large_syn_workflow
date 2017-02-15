@@ -127,7 +127,7 @@ def weightedScore(segments, genomes, gpos, blastMap):
                     hasHit = hasHit_i
                 if hasHit:
                     c += 1
-        res.append((mid, c/((len(segments[mid])-1) * s)))
+        res.append((mid, c/s))
     return res
 
 
@@ -178,6 +178,7 @@ def showHistogram(scores, stype, fileName):
     plt.ylabel('count', fontsize=FONTSIZE_VIS)
     #plt.axis([40, 160, 0, 0.03])
     #plt.grid(True)
+    plt.xlim([0, 1.005])
     plt.savefig(fileName, formtat='eps', transparent=True)
     plt.show()
 
