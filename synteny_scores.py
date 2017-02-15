@@ -3,7 +3,7 @@
 from sys import stdout, stderr, exit, maxint
 from optparse import OptionParser
 from itertools import product, combinations, izip
-from os.path import basename, dirname, join
+from os.path import basename, dirname, join, isfile
 from random import shuffle
 import logging
 import csv
@@ -16,6 +16,20 @@ FONTSIZE_VIS = 20
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.DEBUG)
 
+def readMarkerSequences(data):
+
+    res = list()
+    
+    isHeader = True
+    for _, segid, gene, _, _, in csv.reader(data, delimiter='\t'):
+        if isHeader:
+            isHeader = False
+            continue
+        if int(segid) > len(res):
+            res.append(set())
+        res[-1].add(gene)
+
+    return res
 
 def readIadhoreConfig(data):
 
@@ -82,7 +96,6 @@ def readSegments(data):
     res = dict()
     c = 0
     for line in csv.reader(data, delimiter='\t'):
-        c += 1
         if isHeader:
             isHeader = False
             continue
@@ -90,38 +103,35 @@ def readSegments(data):
         mid = int(line[1])
         if not res.has_key(mid):
             res[mid] = list()
-        res[mid].append((line[2], line[4], line[5]))
+        res[mid].append((c, line[2], line[4], line[5]))
+        c += 1
 
     return res
 
 
-def weightedScore(segments, genomes, gpos, blastMap):
+def weightedScore(segments, marker_seqs, blastMap):
     res = list()
     for mid in sorted(segments.keys()):
         c = 0.0
         s = 0
         for i in xrange(len(segments[mid])):
-            G1, g1i, g1j = segments[mid][i]
-            start1, end1 = sorted((gpos[G1][g1i], gpos[G1][g1j]))
-            s += end1-start1+1
-            for x in xrange(start1, end1+1):
-                g1x = genomes[G1][x]
+            sid1, G1, _, _ = segments[mid][i]
+            s += len(marker_seqs[sid1])
+            for g1x in marker_seqs[sid1]:
                 hasHit = True
                 j = 0
                 while hasHit and j < len(segments[mid]):
                     j += 1
                     if i == j-1:
                         continue
-                    G2, g2k, g2l = segments[mid][j-1]
+                    sid2, G2, _, _ = segments[mid][j-1]
                     hasHit = blastMap.has_key((G1, G2)) and \
                             blastMap[(G1, G2)].has_key(g1x)
                     if not hasHit:
                         break
-                    start2, end2 = sorted((gpos[G2][g2k], gpos[G2][g2l]))
                     hasHit_i = False
                     for g2y in blastMap[(G1, G2)][g1x]:
-                        y = gpos[G2][g2y]
-                        hasHit_i = y >= start2 and y <= end2
+                        hasHit_i = g2y in marker_seqs[sid2]
                         if hasHit_i:
                             break
                     hasHit = hasHit_i
@@ -131,31 +141,27 @@ def weightedScore(segments, genomes, gpos, blastMap):
     return res
 
 
-def relaxedScore(segments, genomes, gpos, blastMap):
+def relaxedScore(segments, marker_seqs, blastMap):
     res = list()
     for mid in sorted(segments.keys()):
         c = 0.0
         s = 0
         for i in xrange(len(segments[mid])):
-            G1, g1i, g1j = segments[mid][i]
-            start1, end1 = sorted((gpos[G1][g1i], gpos[G1][g1j]))
-            s += end1-start1+1
-            for x in xrange(start1, end1+1):
-                g1x = genomes[G1][x]
+            sid1, G1, _, _ = segments[mid][i]
+            s += len(marker_seqs[sid1])
+            for g1x in marker_seqs[sid1]: 
                 hasHit = False
                 j = 0
                 while not hasHit and j < len(segments[mid]):
                     j += 1
                     if i == j-1:
                         continue
-                    G2, g2k, g2l = segments[mid][j-1]
+                    sid2, G2, _, _ = segments[mid][j-1]
                     if not blastMap.has_key((G1, G2)) or \
                             not blastMap[(G1, G2)].has_key(g1x):
                             break
-                    start2, end2 = sorted((gpos[G2][g2k], gpos[G2][g2l]))
                     for g2y in blastMap[(G1, G2)][g1x]:
-                        y = gpos[G2][g2y]
-                        hasHit = y >= start2 and y <= end2
+                        hasHit = g2y in marker_seqs[sid2]
                         if hasHit:
                             break
                 if hasHit:
@@ -233,19 +239,26 @@ if __name__ == '__main__':
             'implemented. Exiting.') %iadhoreCMap['blast_table'])
         exit(1)
 
-    genomes, gene2genome = readGenomes(iadhoreConfig, dirname(args[0]))
-    gpos = dict(map(lambda x: (x[0], dict(izip(x[1], xrange(len(x[1]))))),
-        genomes.items()))
+    listElemFile = join(dirname(args[1]), 'list_elements.txt')
+
+    if not isfile(listElemFile):
+        LOG.fatal(('File %s is required, but does not exist. ' + \
+                'Exiting.') %listElemFile)
+        exit(1)
+
+    marker_seqs = readMarkerSequences(open(listElemFile))
+    _ , gene2genome = readGenomes(iadhoreConfig, dirname(args[0]))
     segments = readSegments(open(args[1]))
+    
     blastMap = readBlastTable(open(join(dirname(args[0]),
         iadhoreCMap['blast_table'])), gene2genome)
 
 
     scores = None
     if options.type == 'relaxed':
-        scores = relaxedScore(segments, genomes, gpos, blastMap)
+        scores = relaxedScore(segments, marker_seqs, blastMap)
     elif options.type == 'weighted':
-        scores = weightedScore(segments, genomes, gpos, blastMap)
+        scores = weightedScore(segments, marker_seqs, blastMap)
     else:
         LOG.fatal('Scoring type must be either relaxed or weighted. Exiting')
         exit(1)
