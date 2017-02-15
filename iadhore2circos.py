@@ -154,32 +154,85 @@ def readSegments(data):
         if isHeader:
             isHeader = False
             continue
-       
+
         if not res.has_key(line[1]):
             res[line[1]] = dict()
         if not res[line[1]].has_key(line[2]):
             res[line[1]][line[2]] = list()
-            m1 = MARKER_PAT.match(line[4])
-            m2 = MARKER_PAT.match(line[5])
-            if not m1 or not m2:
-                print >> stderr, ('Unable to parse marker identifier ' + \
-                        '\"%s\" and/or \"%s\" in line %s of file %s. ' + \
-                        'Exiting') %(line[4], line[5], c, data.name)
-                #exit(1)
-                start1, end2 = line[4:6]
-            else:
-                gid1, start1, end1, _ = m1.groups()
-                gid2, start2, end2, _ = m2.groups()
-                start1, end1, start2, end2 = map(int, (start1, end1, start2,
-                    end2))
 
-                if start1 < start2:
-                    gid1, start1, end1, gid2, start2, end2 = gid2, start2, \
-                            end2, gid1, start1, end1
+        m1 = MARKER_PAT.match(line[4])
+        m2 = MARKER_PAT.match(line[5])
+        if not m1 or not m2:
+            print >> stderr, ('Unable to parse marker identifier ' + \
+                    '\"%s\" and/or \"%s\" in line %s of file %s. ' + \
+                    'Exiting') %(line[4], line[5], c, data.name)
+            #exit(1)
+            start1, end2 = line[4:6]
+        else:
+            gid1, start1, end1, _ = m1.groups()
+            gid2, start2, end2, _ = m2.groups()
+            start1, end1, start2, end2 = map(int, (start1, end1, start2,
+                end2))
+
+            if start1 > start2:
+                gid1, start1, end1, gid2, start2, end2 = gid2, start2, \
+                        end2, gid1, start1, end1
 
         res[line[1]][line[2]].append((line[3], start1, end2))
 
     return res
+
+
+def readCloudAP(gene2genome, data):
+    isHeader = True
+    res = dict()
+
+    for line in csv.reader(data, delimiter='\t'):
+        if isHeader:
+            isHeader = False
+            continue
+
+        if not res.has_key(line[0]):
+            res[line[0]] = dict()
+
+        g1i, g2k = line[1:3]
+        (Gx,chrx), (Gy,chry) = map(gene2genome.get, (g1i, g2k))
+
+        m1 = MARKER_PAT.match(line[1])
+        m2 = MARKER_PAT.match(line[2])
+        if not m1 or not m2:
+            print >> stderr, ('Unable to parse marker identifier ' + \
+                    '\"%s\" and/or \"%s\" in line %s of file %s. ' + \
+                    'Exiting') %(line[4], line[5], c, data.name)
+            #exit(1)
+            start1, end2 = line[4:6]
+        else:
+            gid1, start1, end1, _ = m1.groups()
+            gid2, start2, end2, _ = m2.groups()
+            start1, end1, start2, end2 = map(int, (start1, end1, start2, end2))
+
+            if not res[line[0]].has_key(Gx):
+                res[line[0]][Gx] = list()
+
+            l = res[line[0]][Gx]
+            p = [x for x in xrange(len(l)) if l[x][0] == chrx]
+            if not p:
+                l.append((chrx, start1, end1))
+            else:
+                l[p[0]] = (chrx, min(start1, l[p[0]][1]), max(end1,
+                    l[p[0]][2]))
+
+            if not res[line[0]].has_key(Gy):
+                res[line[0]][Gy] = list()
+
+            l = res[line[0]][Gy]
+            p = [x for x in xrange(len(l)) if l[x][0] == chry]
+            if not p:
+                l.append((chry, start2, end2))
+            else:
+                l[p[0]] = (chry, min(start2, l[p[0]][1]), max(end2,
+                    l[p[0]][2]))
+    return res 
                     
 
 def processMultiplicons(data, segments, allLevels):
@@ -192,14 +245,20 @@ def processMultiplicons(data, segments, allLevels):
             continue
 
         mid = line[0]
-        level = int(line[6])
-        if level > 2 and not allLevels:
+        if not allLevels and int(line[6]) > 2:
             continue
 
         if not segments.has_key(mid):
             print >> stderr, ('Multiplicon with ID %s not found in ' + \
                     'segments file. Exiting') %mid
             exit(1)
+
+        level=1
+        if len(line) > 5:
+            try:
+                level = int(line[6])
+            except:
+                pass
 
         for G1, G2 in combinations(sorted(segments[mid].keys()), 2):
             if not res.has_key((G1, G2)):
@@ -319,7 +378,9 @@ def writeCircosConf(g1name, g1, g2name, g2, multiplicons, sbs, out):
 
 
 if __name__ == '__main__':
-    usage = 'usage: %prog [options] <I-ADHORE CONFIGURAION FILE> <MULTIPLICONS FILE> <SEGMENTS FILE>'
+    usage = 'usage: %prog [options] <I-ADHORE CONFIGURAION FILE> ' + \
+            '[<MULTIPLICONS FILE> <SEGMENTS FILE>] OR [<CLOUDS FILE> ' + \
+            '<CLOUD_AP FILE>]'
     parser = OptionParser(usage=usage)
     parser.add_option('-c', '--color_links', dest='colorLinks', default=False,
             action='store_true', help='Color links individually')
@@ -338,7 +399,6 @@ if __name__ == '__main__':
 
     iadhoreConfig = readIadhoreConfig(open(args[0]))
     gNames, genomes = readGenomes(iadhoreConfig, dirname(args[0]))
-
     #
     # write ticks & ideogram conf 
     #
@@ -363,9 +423,23 @@ if __name__ == '__main__':
     # write links and circos conf
     #
 
-    segments = readSegments(open(args[2]))
-    syn_blocks = processMultiplicons(open(args[1]), segments,
-            options.allLevels)
+    if basename(args[2]).lower() == 'cloudap.txt':
+
+        gene2genome = dict()
+        for x in xrange(len(genomes)):
+            Gx = gNames[x]
+            for chrx, genes in genomes[x].items():
+                for g in genes:
+                    gid = '%s:%s:%s' %g[:3]
+                    gene2genome[gid] = (Gx, chrx)
+
+        segments = readCloudAP(gene2genome, open(args[2]))
+        syn_blocks = processMultiplicons(open(args[1]), segments, True)
+
+    else:
+        segments = readSegments(open(args[2]))
+        syn_blocks = processMultiplicons(open(args[1]), segments,
+                options.allLevels)
 
     gname2id = dict(zip(gNames, range(len(gNames))))
     for (G1, G2), sbs in syn_blocks.items():
