@@ -206,7 +206,7 @@ if __name__ == '__main__':
     parser.add_option('-t', '--type', dest='type', default='relaxed', type=str,
             help='Scoring type. [default: %default]', metavar=
             '(relaxed|weighted)')
-    parser.add_option('-o', '--only_all', dest='onlyAll', default=False,
+    parser.add_option('-a', '--only_all', dest='onlyAll', default=False,
             action='store_true', help='Consider only those multiplicons ' + \
                     'that span all genomes, not just a subset [default: ' + \
                     '%default]')
