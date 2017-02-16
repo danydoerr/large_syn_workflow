@@ -235,7 +235,7 @@ def readCloudAP(gene2genome, data):
     return res 
                     
 
-def processMultiplicons(data, segments, allLevels):
+def processMultiplicons(data, segments, allLevels, n, onlyAll=False):
 
     res = dict()
     isHeader = True
@@ -252,6 +252,9 @@ def processMultiplicons(data, segments, allLevels):
             print >> stderr, ('Multiplicon with ID %s not found in ' + \
                     'segments file. Exiting') %mid
             exit(1)
+
+        if onlyAll and len(segments[mid]) < n:
+            continue
 
         level=1
         if len(line) > 5:
@@ -387,6 +390,10 @@ if __name__ == '__main__':
     parser.add_option('-o', '--outdir', dest='outDir', default='.', type=str, 
             help='Direction to which the output files will be written. ' + \
                     '[default=%default]')
+    parser.add_option('-a', '--only_all', dest='onlyAll', default=False,
+            action='store_true', help='Consider only those multiplicons ' + \
+                    'that span all genomes, not just a subset [default: ' + \
+                    '%default]')
     parser.add_option('-l', '--plot_all_levels', dest='allLevels', default=False,
             action='store_true', help='Not only draw level 2 intervals, ' + \
                     'but also intervals from higher levels [default: %default]')
@@ -434,12 +441,13 @@ if __name__ == '__main__':
                     gene2genome[gid] = (Gx, chrx)
 
         segments = readCloudAP(gene2genome, open(args[2]))
-        syn_blocks = processMultiplicons(open(args[1]), segments, True)
+        syn_blocks = processMultiplicons(open(args[1]), segments, True,
+                len(gNames), options.onlyAll)
 
     else:
         segments = readSegments(open(args[2]))
         syn_blocks = processMultiplicons(open(args[1]), segments,
-                options.allLevels)
+                options.allLevels, len(gNames), options.onlyAll)
 
     gname2id = dict(zip(gNames, range(len(gNames))))
     for (G1, G2), sbs in syn_blocks.items():
